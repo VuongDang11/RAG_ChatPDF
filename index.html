@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Architect & Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f3f4f6;
+    }
+
+    .terminal-bg {
+      background-color: #0f172a;
+      color: #10b981;
+      font-family: 'Fira Code', monospace;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(229, 231, 235, 0.5);
+    }
+
+    .step-active {
+      border-left: 4px solid #3b82f6;
+      background-color: #eff6ff;
+    }
+
+    .stats-box {
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid #334155;
+    }
+  </style>
+</head>
+
+<body class="h-screen overflow-hidden flex flex-col">
+
+  <header class="h-14 border-b bg-white flex items-center justify-between px-6 shrink-0 shadow-sm">
+    <div class="flex items-center gap-2">
+      <div class="bg-blue-600 p-1.5 rounded-lg text-white"><i data-lucide="cpu" class="w-5 h-5"></i></div>
+      <h1 class="font-bold text-gray-800">RAG Architect & Simulator</h1>
+    </div>
+  </header>
+
+  <main class="flex-1 flex overflow-hidden">
+    <aside class="w-80 border-r bg-gray-50 flex flex-col p-4 space-y-4">
+      <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">RAG Architecture</h2>
+      <button onclick="switchStep('ingestion')" id="btn-ingestion"
+        class="step-card w-full p-4 rounded-xl glass-card text-left step-active">
+        <div class="font-bold text-sm">1. Document Ingestion</div>
+      </button>
+      <button onclick="switchStep('chunking')" id="btn-chunking"
+        class="step-card w-full p-4 rounded-xl glass-card text-left">
+        <div class="font-bold text-sm">2. Text Splitting</div>
+      </button>
+      <button onclick="switchStep('retrieval')" id="btn-retrieval"
+        class="step-card w-full p-4 rounded-xl glass-card text-left">
+        <div class="font-bold text-sm">3. Retrieval Phase</div>
+      </button>
+      <button onclick="switchStep('generation')" id="btn-generation"
+        class="step-card w-full p-4 rounded-xl glass-card text-left">
+        <div class="font-bold text-sm">4. AI Generation</div>
+      </button>
+    </aside>
+
+    <section class="flex-1 bg-white p-8 overflow-y-auto">
+      <div id="simulation-content" class="max-w-4xl mx-auto h-full">
+        <div id="state-ingestion" class="space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800">Document Ingestion</h2>
+          <div
+            class="border-2 border-dashed border-gray-200 rounded-2xl p-12 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer group"
+            onclick="document.getElementById('file-input').click()">
+            <div class="bg-blue-500 p-4 rounded-full text-white mb-4 shadow-lg group-hover:scale-110 transition-transform">
+              <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+            </div>
+            <p class="font-semibold text-gray-700">Click to upload source PDF</p>
+            <p class="text-sm text-gray-400 mt-1">Supports PDF (Max 10MB)</p>
+            <input type="file" id="file-input" class="hidden" accept=".pdf" onchange="handleFile(event)">
+          </div>
+        </div>
+    
+        <div id="state-chunking" class="hidden space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800">Configure Chunking</h2>
+    
+          <div class="p-6 border rounded-2xl bg-gray-50 space-y-4 shadow-sm">
+            <select id="strategy-select" onchange="toggleTuning()" class="w-full border rounded-lg p-3 text-sm">
+              <option value="recursive">Recursive Character</option>
+              <option value="fixed-size">Fixed Size</option>
+              <option value="semantic">Semantic</option>
+              <option value="structural">Structural (Markdown Headers)</option>
+              <option value="hierarchical">Hierarchical</option>
+            </select>
+            <div id="tuning-params" class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-2">Chunk Size</label>
+                <input type="number" id="chunk-size" value="500" class="w-full border rounded p-3 text-sm" placeholder="Size">
+              </div>
+              <div>
+                <label class="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-2">Overlap</label>
+                <input type="number" id="chunk-overlap" value="50" class="w-full border rounded p-3 text-sm" placeholder="Overlap">
+              </div>
+              </div>
+            </div>
+            <button onclick="triggerIngest()"
+              class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-all">PROCESS &
+              VECTORIZE</button>
+          </div>
+    
+          <div id="stats-area" class="stats-box hidden">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold uppercase text-slate-400">Pipeline Stats</span>
+              <span id="stat-strategy"
+                class="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold uppercase"></span>
+            </div>
+            <div class="mt-2 text-2xl font-bold" id="stat-count">0 <span class="text-sm font-medium text-slate-500">chunks
+                generated</span></div>
+          </div>
+    
+          <div>
+            <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-2">System Monitor</h3>
+            <div id="logs" class="terminal-bg h-48 rounded-lg p-4 text-[11px] overflow-y-auto shadow-inner">
+              <div class="opacity-50 font-mono">[READY] Select strategy and run...</div>
+            </div>
+          </div>
+    
+          <div id="chunk-display" class="space-y-3"></div>
+        </div>
+    
+        <div id="state-retrieval" class="hidden space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800">Retrieval Phase</h2>
+          <div
+            class="flex gap-2 mb-8 bg-white border-2 border-blue-100 rounded-2xl p-1 shadow-sm focus-within:border-blue-500 transition-all">
+            <input type="text" id="search-query" placeholder="Ask a question about the document..."
+              class="flex-1 rounded-xl p-4 text-sm outline-none">
+            <button onclick="triggerSearch()"
+              class="bg-blue-600 text-white px-8 rounded-xl font-bold hover:bg-blue-700 transition-colors">Search</button>
+          </div>
+          <div id="search-results" class="space-y-4"></div>
+        </div>
+    
+        <div id="state-generation" class="hidden space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800">AI Generation</h2>
+    
+          <div class="flex flex-col gap-6 mt-2">
+    
+            <div class="flex flex-col gap-2">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">User Query</span>
+              <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl text-blue-900 font-medium" id="display-query">
+                <span class="text-blue-400 italic font-normal">No query entered yet. Please run a search in Step 3.</span>
+              </div>
+            </div>
+    
+            <div class="flex flex-col gap-2">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Context Injected (From Vector
+                DB)</span>
+              <div
+                class="bg-slate-100 border border-slate-200 p-4 rounded-xl text-slate-600 text-xs h-40 overflow-y-auto font-mono shadow-inner whitespace-pre-wrap"
+                id="display-context">
+                <span class="text-slate-400 italic">No context retrieved yet.</span>
+              </div>
+            </div>
+    
+            <div class="flex flex-col gap-2">
+              <div class="flex justify-between items-center">
+                <span class="text-xs font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="bot" class="w-4 h-4"></i> AI Response
+                </span>
+                <button onclick="triggerGenerate()" id="btn-gen"
+                  class="bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-2">
+                  <i data-lucide="sparkles" class="w-3 h-3"></i> Generate Answer
+                </button>
+              </div>
+              <div
+                class="bg-white border-2 border-indigo-200 p-6 rounded-xl text-gray-800 leading-relaxed shadow-md text-sm min-h-[150px]"
+                id="display-answer">
+                <span class="text-gray-400 italic">Context loaded. Click "Generate Answer" to synthesize...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+    
+      </div>
+    </section>
+  </main>
+
+  <script>
+    lucide.createIcons();
+    let lastContext = "";
+
+    function addLog(msg, color = 'text-emerald-500') {
+      const logs = document.getElementById('logs');
+      const entry = document.createElement('div');
+      entry.innerHTML = `<span class="${color} mr-2">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+      logs.prepend(entry);
+    }
+
+    function switchStep(step) {
+      ['ingestion', 'chunking', 'retrieval', 'generation'].forEach(s => {
+        const el = document.getElementById(`state-${s}`);
+        if (el) el.classList.add('hidden');
+        document.getElementById(`btn-${s}`).classList.remove('step-active');
+      });
+      document.getElementById(`state-${step}`).classList.remove('hidden');
+      document.getElementById(`btn-${step}`).classList.add('step-active');
+    }
+
+    // New: Handle File Upload visually
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (file) {
+        addLog(`File loaded: ${file.name}`);
+        switchStep('chunking'); // Move to next step automatically
+      }
+    }
+
+    // New: Toggle sliders if strategy doesn't need them
+    function toggleTuning() {
+      const strat = document.getElementById('strategy-select').value;
+      const tuning = document.getElementById('tuning-params');
+      if (strat === 'semantic' || strat === 'structural') {
+        tuning.classList.add('hidden');
+      } else {
+        tuning.classList.remove('hidden');
+      }
+    }
+
+    async function triggerIngest() {
+      const fileInput = document.getElementById('file-input');
+      if (!fileInput.files[0]) return alert("Please upload a document first in Step 1.");
+
+      const strategy = document.getElementById('strategy-select').value;
+      addLog(`Initializing ${strategy} chunking...`, 'text-blue-400');
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      formData.append("strategy", strategy);
+      formData.append("chunk_size", document.getElementById('chunk-size').value);
+      formData.append("overlap", document.getElementById('chunk-overlap').value);
+
+      try {
+        const res = await fetch("http://localhost:8000/api/ingest", { method: "POST", body: formData });
+        const data = await res.json();
+
+        // Update Stats Box
+        document.getElementById('stats-area').classList.remove('hidden');
+        document.getElementById('stat-strategy').innerText = data.strategy;
+        document.getElementById('stat-count').innerHTML = `${data.count} <span class="text-sm font-medium text-slate-500">chunks generated</span>`;
+
+        addLog(data.message);
+        if (data.preview) {
+          data.preview.reverse().forEach((txt, i) => addLog(`Chunk #${data.count - i}: ${txt.substring(0, 100)}...`, 'text-slate-400 text-[10px]'));
+        }
+      } catch (err) {
+        addLog(`Error during ingestion: ${err.message}`, 'text-red-500');
+      }
+    }
+    async function triggerSearch() {
+        const query = document.getElementById('search-query').value;
+        if (!query) return;
+        addLog(`Searching Vector Index for: "${query}"`, 'text-blue-400');
+
+        try {
+          const response = await fetch(`http://localhost:8000/api/search?query=${encodeURIComponent(query)}`);
+          const data = await response.json();
+
+          const display = document.getElementById('search-results');
+          display.innerHTML = '';
+          lastContext = data.results.map(r => r.text).join("\n\n");
+
+          data.results.forEach((res, i) => {
+            display.innerHTML += `
+                <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-xs font-bold text-emerald-600 uppercase">Match ${i + 1}</span>
+                        <span class="text-xs font-mono text-emerald-500">Score: ${res.score.toFixed(4)}</span>
+                    </div>
+                    <p class="text-sm text-gray-700 italic">"${res.text}"</p>
+                </div>`;
+          });
+
+          // --- THIS POPULATES BOX 1 AND BOX 2 ---
+          document.getElementById('display-query').innerText = query;
+          document.getElementById('display-context').innerText = lastContext;
+          document.getElementById('display-answer').innerHTML = '<span class="text-gray-400 italic">Context loaded. Click "Generate Answer" above to synthesize...</span>';
+
+          addLog(`Retrieved ${data.results.length} chunks. Ready for generation.`);
+        } catch (err) {
+          addLog(`Search Error: ${err.message}`, 'text-red-500');
+        }
+      }
+
+      async function triggerGenerate() {
+        const btn = document.getElementById('btn-gen');
+        const query = document.getElementById('display-query').innerText;
+
+        if (!query || !lastContext || query.includes("No query entered")) {
+          return alert("Please run a search in Step 3 first!");
+        }
+
+        // --- THIS SHOWS THE LOADING SPINNER IN BOX 3 ---
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> THINKING...`;
+        btn.disabled = true;
+        document.getElementById('display-answer').innerHTML = `
+        <div class="flex items-center gap-3 text-indigo-500 font-medium italic">
+            <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> Generating response via Llama 3.1...
+        </div>`;
+        lucide.createIcons();
+
+        const formData = new FormData();
+        formData.append("query", query);
+        formData.append("context", lastContext);
+
+        try {
+          const res = await fetch("http://localhost:8000/api/generate", { method: "POST", body: formData });
+          const data = await res.json();
+
+          // --- THIS POPULATES BOX 3 WITH THE LLM ANSWER ---
+          // It also converts bold markdown (**text**) to HTML (<b>text</b>) so it looks nice
+          let formattedAnswer = data.answer.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+          document.getElementById('display-answer').innerHTML = formattedAnswer;
+
+        } catch (err) {
+          addLog(`Generation Error: ${err.message}`, 'text-red-500');
+          document.getElementById('display-answer').innerHTML = `<span class="text-red-500 font-bold">Error:</span> ${err.message}`;
+        } finally {
+          // Reset the button
+          btn.innerHTML = `<i data-lucide="sparkles" class="w-3 h-3"></i> Generate Answer`;
+          btn.disabled = false;
+          lucide.createIcons();
+        }
+      }
+
+    
+  </script>
+</body>
+
+</html>
