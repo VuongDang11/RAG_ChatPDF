@@ -1,0 +1,8 @@
+MONGODB_URI= ""
+MONGODB_DB = "RAG"
+MONGODB_COL="chunks"
+
+OLLAMA_HOST=
+OLLAMA_MODEL=llama3.1
+OLLAMA_EMBED_MODEL=nomic-embed-text
+
