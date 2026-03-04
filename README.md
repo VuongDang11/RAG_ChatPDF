@@ -3,7 +3,7 @@ RAG_ChatPDF: AI-Powered Document Intelligence
 🛠️ Tech Stacks
 Python 3.9+, FastAPI, Uvicorn, LangChain, MongoDB / Frontend Node.js, NPM, React/Next.js
 
-1. Backend Setup (Python & FastAPI)
+# 1. Backend Setup (Python & FastAPI)
 Ensure you have Python 3.9+ installed. Open your terminal in the project root:
 
 Bash
@@ -21,7 +21,7 @@ ollama pull llama3.1
 # Start the FastAPI server
 uvicorn main:app --reload --port 8000
 
-2. Frontend Setup (Node.js & NPM)
+# 2. Frontend Setup (Node.js & NPM)
 Open a second terminal window in the project root:
 
 Bash
